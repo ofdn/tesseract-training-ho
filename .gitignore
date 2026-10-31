@@ -1,0 +1,7 @@
+lstmf/
+rendered/
+scan-input/
+output/
+tessdata_best/
+logs/
+.DS_Store

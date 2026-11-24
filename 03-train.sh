@@ -1,6 +1,7 @@
 #!/bin/bash
-# Fine-tunes the Ho model from Latin. The output layer is rebuilt for
-# the Warang Citi unicharset, so the error rate starts near 100% and falls fast.
+# Trains the Ho model on top of Latin. Latin's lower layers are kept and
+# the top LSTM and output layer are replaced, since Warang Citi shares no
+# letters with Latin. The error rate starts at 100%.
 # Checkpoints go to output/. Stop with Ctrl+C and run again to resume from
 # output/hoc_checkpoint.
 #
@@ -17,6 +18,8 @@ lstmtraining \
     --continue_from      output/latin.lstm \
     --old_traineddata    tessdata_best/Latin.traineddata \
     --traineddata        tessdata_best/hoc_base.traineddata \
+    --append_index       5 \
+    --net_spec           '[Lfx256 O1c1]' \
     --model_output       output/hoc \
     --train_listfile     lstmf/list.txt \
     --eval_listfile      lstmf/eval.txt \

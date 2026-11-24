@@ -6,16 +6,18 @@ Takes clean synthetic rendered lines and applies realistic degradation
 conditions. This bridges the distribution gap between clean renders
 and real scanned documents.
 
-Output: augmented PNG + copied .box → tesseract lstm.train → .lstmf
+Output: augmented PNG + gt.txt → linebox.py → .lstmf
 """
-import sys, shutil, subprocess, random
+import sys, shutil, random
 from pathlib import Path
 from PIL import Image, ImageFilter, ImageEnhance, ImageOps
 import numpy as np
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from linebox import make_lstmf
+
 RENDERED_DIR = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("lstmf/rendered")
 OUT_DIR = Path(sys.argv[2]) if len(sys.argv) > 2 else Path("lstmf/augmented")
-TESSDATA = "tessdata_best"
 PER_SOURCE = int(sys.argv[3]) if len(sys.argv) > 3 else 25
 
 random.seed(42)
@@ -68,14 +70,14 @@ for prefix, stems in sorted(sources.items()):
 
     for stem in selected:
         src_png = RENDERED_DIR / f"{stem}.png"
-        src_box = RENDERED_DIR / f"{stem}.box"
-        if not src_png.exists() or not src_box.exists():
+        src_gt = RENDERED_DIR / f"{stem}.gt.txt"
+        if not src_png.exists() or not src_gt.exists():
             fail += 1
             continue
 
         aug_stem = f"aug_{stem}"
         dst_png = OUT_DIR / f"{aug_stem}.png"
-        dst_box = OUT_DIR / f"{aug_stem}.box"
+        dst_gt = OUT_DIR / f"{aug_stem}.gt.txt"
         dst_lstmf = OUT_DIR / f"{aug_stem}.lstmf"
 
         if dst_lstmf.exists():
@@ -85,26 +87,14 @@ for prefix, stems in sorted(sources.items()):
         img = Image.open(src_png)
         degraded = degrade(img)
         degraded.save(dst_png)
-        shutil.copy2(src_box, dst_box)
-
-        made = False
-        for psm in ("7", "6", "10"):
-            subprocess.run(
-                ["tesseract", str(dst_png), str(OUT_DIR / aug_stem),
-                 "--tessdata-dir", TESSDATA,
-                 "--dpi", "300", "--psm", psm,
-                 "-l", "sat_base", "lstm.train"],
-                capture_output=True, text=True
-            )
-            if dst_lstmf.exists():
-                made = True
-                break
+        shutil.copy2(src_gt, dst_gt)
+        made = make_lstmf(dst_png, src_gt.read_text(encoding="utf-8"))
 
         if made:
             ok += 1
         else:
             dst_png.unlink(missing_ok=True)
-            dst_box.unlink(missing_ok=True)
+            dst_gt.unlink(missing_ok=True)
             fail += 1
 
     print(f"  {prefix}: {ok} OK, {fail} failed (of {len(selected)} selected)")
